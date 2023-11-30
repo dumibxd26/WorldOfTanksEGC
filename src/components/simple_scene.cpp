@@ -243,7 +243,7 @@ void SimpleScene::RenderMesh2D(Mesh * mesh, const glm::mat3 & modelMatrix, const
 }
 
 
-void SimpleScene::RenderMesh(Mesh * mesh, Shader * shader, const glm::mat4 & modelMatrix)
+void SimpleScene::RenderMesh(Mesh * mesh, Shader * shader, const glm::mat4 & modelMatrix, const glm::vec3& color)
 {
     if (!mesh || !shader || !shader->program)
         return;
@@ -253,6 +253,9 @@ void SimpleScene::RenderMesh(Mesh * mesh, Shader * shader, const glm::mat4 & mod
     glUniformMatrix4fv(shader->loc_view_matrix, 1, GL_FALSE, glm::value_ptr(camera->GetViewMatrix()));
     glUniformMatrix4fv(shader->loc_projection_matrix, 1, GL_FALSE, glm::value_ptr(camera->GetProjectionMatrix()));
     glUniformMatrix4fv(shader->loc_model_matrix, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+    GLint location_material = glGetUniformLocation(shader->program, "object_color");
+    glUniform3fv(location_material, 1, glm::value_ptr(color));
 
     mesh->Render();
 }

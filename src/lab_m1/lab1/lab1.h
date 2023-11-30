@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components/simple_scene.h"
+#include "string.h"
 
 
 namespace m1
@@ -28,6 +29,12 @@ namespace m1
         void OnWindowResize(int width, int height) override;
 
         // TODO(student): Class variables go here
+        float red, green, blue;
+        glm::vec3 color;
+        glm::vec3 box_position;
+        Mesh* changing_object;
 
+        float speeed;
+        int k;
     };
 }   // namespace m1

@@ -27,14 +27,20 @@ namespace m1
         void OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY) override;
         void OnWindowResize(int width, int height) override;
 
-     protected:
+
+
+        // TODO(student): If you need any other class variables, define them here.
+    protected:
         float cx, cy;
         glm::mat3 modelMatrix;
         float translateX, translateY;
         float scaleX, scaleY;
         float angularStep;
+        float squareDistance = 100.f;
 
-        // TODO(student): If you need any other class variables, define them here.
+        float directionY;
+        float positionY1;
+        float scaleWay;
 
     };
 }   // namespace m1

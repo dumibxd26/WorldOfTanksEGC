@@ -1,22 +1,13 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "components/simple_scene.h"
-#include "components/transform.h"
-#include "core/gpu/frame_buffer.h"
+#include "core/gpu/particle_effect.h"
 
 
 namespace m2
 {
-    struct LightInfo
-    {
-        glm::vec3 position;
-        glm::vec3 color;
-        float radius;
-    };
-
     class Lab5 : public gfxc::SimpleScene
     {
      public:
@@ -30,6 +21,8 @@ namespace m2
         void Update(float deltaTimeSeconds) override;
         void FrameEnd() override;
 
+        void LoadShader(const std::string &name, bool hasGeomtery = true);
+
         void OnInputUpdate(float deltaTime, int mods) override;
         void OnKeyPress(int key, int mods) override;
         void OnKeyRelease(int key, int mods) override;
@@ -39,12 +32,12 @@ namespace m2
         void OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY) override;
         void OnWindowResize(int width, int height) override;
 
-        void LoadShader(const std::string &fileName);
 
-     private:
-        FrameBuffer *frameBuffer;
-        FrameBuffer *lightBuffer;
-        std::vector<LightInfo> lights;
-        int outputType;
+     protected:
+        glm::mat4 modelMatrix;
+        float translateX, translateY, translateZ;
+        float scaleX, scaleY, scaleZ;
+        float angularStepOX, angularStepOY, angularStepOZ;
+        GLenum polygonMode;
     };
 }   // namespace m2

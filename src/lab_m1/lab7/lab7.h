@@ -2,7 +2,15 @@
 
 #include "components/simple_scene.h"
 #include "components/transform.h"
+#include "./Classes/Building.h";
+#include "./Classes/Building.h"
+#include "./Classes/TankComponent.h"
+#include "./Classes/Tank.h"
+#include "./Classes/Projectile.h"
+#include "./Classes/PowerUp.h"
 
+#define BUILDINGS_NUMBER 10
+#define POWER_UPS_NUMBER 9
 
 namespace m1
 {
@@ -30,9 +38,74 @@ namespace m1
         void OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY) override;
         void OnWindowResize(int width, int height) override;
 
+        float startTime;
+        bool gameOver;
+
         glm::vec3 lightPosition;
         unsigned int materialShininess;
         float materialKd;
         float materialKs;
+
+        std::vector <Projectile *> projectiles_vector;
+
+        Mesh* building;
+        std::vector<Building *> buildings;
+        // 10 buildings
+        std::vector<glm::vec3> buildingsPositions = {
+            {2, 1, 1},
+            {2, 1, 7.5f},
+            {8, 1, -1},
+            {7, 1, -6.5f},
+            {-3, 1, 4},
+            {-8, 1, 2.5f},
+            {-6, 1, -9},
+            {-2, 1, -5.5f},
+            {6, 1, 5},
+            {10, 1, 2},
+        };
+        std::vector<glm::vec3> buildingsColors = {
+            {0.2f, 0.5f, 0.2f},
+            {1, 0.5f, 0.2f},
+            {0.2f, 0.5f, 1},
+            {0.2f, 1, 0.5f},
+            {0.5f, 0.2f, 0.5f},
+            {0.5f, 0.2f, 1},
+            {1, 0.2f, 0.5f},
+            {0.2f, 1, 0.2f},
+            {0.5f, 0.5f, 0.2f},
+            {0.5f, 0.5f, 1}
+        };
+        // those are scales, can and will be floats
+        std::vector<glm::vec3> buildingsSizes = {
+            {1.5f, 2, 1.3f},
+            {1.3f, 2.5f, 1.2f},
+            {1.2f, 2.2f, 1.5f},
+			{1.5f, 2.5f, 1.3f},
+			{1.3f, 2.3f, 1.2f},
+			{1.2f, 2.2f, 1.5f},
+			{1.5f, 2.5f, 1.3f},
+			{1.3f, 2.3f, 1.2f},
+			{1.2f, 2.2f, 1.5f},
+			{1.5f, 2.75f, 1.3f}
+        };
+
+        // power ups position that dont collide with buildings
+        // 9 power ups (3 of each type)
+        // WRITE SOME RANDOM POSITION HERE
+        std::vector<glm::vec3> powerUpsPositions = {
+            {1.5f, 0.5f, 1.5f},
+			{1.5f, 0.5f, 7.5f},
+			{8.5f, 0.5f, -1.5f},
+			{7.5f, 0.5f, -6.5f},
+			{-3.5f, 0.5f, 4.5f},
+			{-8.5f, 0.5f, 2.5f},
+			{-6.5f, 0.5f, -9.5f},
+			{-2.5f, 0.5f, -5.5f},
+			{6.5f, 0.5f, 5.5f}
+		};
+
+        std::vector<PowerUp *> powerUps_vector;
+        
+        Tank* my_tank;
     };
 }   // namespace m1

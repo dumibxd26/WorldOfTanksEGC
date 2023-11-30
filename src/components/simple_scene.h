@@ -43,7 +43,7 @@ namespace gfxc
         virtual void RenderMesh2D(Mesh *mesh, Shader *shader, const glm::mat3 &modelMatrix);
         virtual void RenderMesh2D(Mesh *mesh, const glm::mat3 &modelMatrix, const glm::vec3 &color) const;
 
-        virtual void RenderMesh(Mesh *mesh, Shader *shader, const glm::mat4 &modelMatrix);
+        virtual void RenderMesh(Mesh* mesh, Shader* shader, const glm::mat4& modelMatrix, const glm::vec3& color = glm::vec3(1));
 
         Camera *GetSceneCamera() const;
         InputController *GetCameraInput() const;

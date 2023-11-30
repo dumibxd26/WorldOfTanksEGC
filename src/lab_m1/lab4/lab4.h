@@ -7,7 +7,7 @@ namespace m1
 {
     class Lab4 : public gfxc::SimpleScene
     {
-     public:
+    public:
         struct ViewportArea
         {
             ViewportArea() : x(0), y(0), width(1), height(1) {}
@@ -24,7 +24,7 @@ namespace m1
 
         void Init() override;
 
-     private:
+    private:
         void FrameStart() override;
         void Update(float deltaTimeSeconds) override;
         void FrameEnd() override;
@@ -39,7 +39,7 @@ namespace m1
         void OnWindowResize(int width, int height) override;
 
         void RenderScene();
-     protected:
+    protected:
         glm::mat4 modelMatrix;
         float translateX, translateY, translateZ;
         float scaleX, scaleY, scaleZ;
