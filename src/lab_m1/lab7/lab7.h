@@ -11,6 +11,7 @@
 
 #define BUILDINGS_NUMBER 10
 #define POWER_UPS_NUMBER 9
+#define ENEMY_TANKS_NUMBER 6
 
 namespace m1
 {
@@ -39,7 +40,9 @@ namespace m1
         void OnWindowResize(int width, int height) override;
 
         float startTime;
+        int prevTime = 60;
         bool gameOver;
+        int score;
 
         glm::vec3 lightPosition;
         unsigned int materialShininess;
@@ -89,23 +92,35 @@ namespace m1
 			{1.5f, 2.75f, 1.3f}
         };
 
-        // power ups position that dont collide with buildings
-        // 9 power ups (3 of each type)
-        // WRITE SOME RANDOM POSITION HERE
         std::vector<glm::vec3> powerUpsPositions = {
-            {1.5f, 0.5f, 1.5f},
-			{1.5f, 0.5f, 7.5f},
-			{8.5f, 0.5f, -1.5f},
-			{7.5f, 0.5f, -6.5f},
-			{-3.5f, 0.5f, 4.5f},
-			{-8.5f, 0.5f, 2.5f},
-			{-6.5f, 0.5f, -9.5f},
-			{-2.5f, 0.5f, -5.5f},
-			{6.5f, 0.5f, 5.5f}
+            {3, 0.075f, 2},
+			{3, 0.075f, 8.5f},
+			{7, 0.075f, -2},
+			{4, 0.075f, -3.5f},
+			{-2, 0.075f, 1},
+			{-5, 0.075f, 8.5f},
+			{-8, 0.075f, -7},
+			{-1, 0.075f, -5.5f},
+			{4, 0.075f, 4},
 		};
 
         std::vector<PowerUp *> powerUps_vector;
         
         Tank* my_tank;
+
+        std::vector <Tank*> enemy_tanks;
+
+        std::vector<glm::vec3> enemy_tanks_positions = {
+            {-7, 0, -2},
+            {-2, 0, -7},
+            {3, 0, 1},
+            {7, 0, -3},
+            {-9, 0 , 7},
+            {8, 0, 8}
+		};
+
+        std::vector<float> enemy_tanks_rotations = {
+            -90, 0, 0, 90, -90, 90
+        };
     };
 }   // namespace m1

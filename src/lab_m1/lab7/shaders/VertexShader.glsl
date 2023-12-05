@@ -18,6 +18,7 @@ uniform float material_ks;
 uniform int material_shininess;
 
 uniform vec3 object_color;
+uniform float HP;
 
 // Output value to fragment shader
 out vec3 color;

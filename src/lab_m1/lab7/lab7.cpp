@@ -7,7 +7,13 @@
 using namespace std;
 using namespace m1;
 
-#define COLLISION_ERROR 0.25f
+#define BUILDINGS_COLLISION_ERROR 0.25f
+#define PUPS_COLLISION_ERROR 0.125f
+#define TANK_COLLISION_ERROR 0.15f
+#define ENEMY_TANK_MOVEMENT 3.0f
+#define PROJECTILE_SHOOTING_TIME 0.5f
+
+#define PROJECTILE_MAX_TIME 2
 
 /*
  *  To find out more about `FrameStart`, `Update`, `FrameEnd`
@@ -30,6 +36,7 @@ void Lab7::Init()
 	// time when the game starts
 	startTime = glfwGetTime();
 	gameOver = false;
+	score = 0;
 
 	{
 		building = new Mesh("building");
@@ -61,7 +68,7 @@ void Lab7::Init()
 
 	{
 		Mesh* mesh = new Mesh("TANK_HEAD");
-		mesh->LoadMesh(PATH_JOIN(window->props.selfDir, RESOURCE_PATH::MODELS, "primitives"), "TANK_CENTERED_HEAD.obj");
+		mesh->LoadMesh(PATH_JOIN(window->props.selfDir, RESOURCE_PATH::MODELS, "primitives"), "TANK_HEAD_BUN_SPER.obj");
 		meshes[mesh->GetMeshID()] = mesh;
 		my_tank_head = new TankComponent("TANK_HEAD", glm::vec3(0, 0.13f, 0), glm::vec3(0, 0.5f, 0), 1, -90.0f, 1, 0, 0, 1);
 	}
@@ -73,9 +80,27 @@ void Lab7::Init()
 		my_tank_tracks = new TankComponent("TANK_TRACKS", glm::vec3(-0.005f, 0.04f, 0), glm::vec3(0.5f), 1, 90.0f, 1, 0, 0, -1);
 	}
 
-	my_tank = new Tank(glm::vec3(0), 1, 0, my_tank_head, my_tank_cannon, my_tank_tracks, my_tank_base);
+	my_tank = new Tank(glm::vec3(0), 1, 0, my_tank_head, my_tank_cannon, my_tank_tracks, my_tank_base, false);
 	// calculated on onShape app and chatgpt -> 0.17 / 2
 	my_tank->radius = 0.17f / 2;
+
+	{
+		for (int i = 0; i < ENEMY_TANKS_NUMBER; i++) {
+			TankComponent* enemy_tank_head, * enemy_tank_cannon, * enemy_tank_base, * enemy_tank_tracks;
+
+			enemy_tank_base = new TankComponent("TANK_BASE", glm::vec3(0, .04f, 0), glm::vec3(0, 1, 0), 1, -90.0f, 1, 0, 0, 1);
+			enemy_tank_cannon = new TankComponent("TANK_CANNON_LONG", glm::vec3(0, .14f, 0), glm::vec3(0.5f), 1, 0, 0.5f, 0, 1, 0);
+			enemy_tank_head = new TankComponent("TANK_HEAD", glm::vec3(0, 0.13f, 0), glm::vec3(0, 0.5f, 0), 1, -90.0f, 1, 0, 0, 1);
+			enemy_tank_tracks = new TankComponent("TANK_TRACKS", glm::vec3(-0.005f, 0.04f, 0), glm::vec3(0.5f), 1, 90.0f, 1, 0, 0, -1);
+
+			// random real number between 0 and 90 defining the start rotation angle
+			// float rotation_angle = rand() % 90;
+
+			Tank* enemy_tank = new Tank(enemy_tanks_positions[i], 1, enemy_tanks_rotations[i], enemy_tank_head, enemy_tank_cannon, enemy_tank_tracks, enemy_tank_base, true);
+			enemy_tank->radius = 0.17f / 2;
+			enemy_tanks.push_back(enemy_tank);
+		}
+	}
 
 	{
 		Mesh* mesh = new Mesh("AGORA");
@@ -155,17 +180,92 @@ void Lab7::FrameStart()
 
 void Lab7::Update(float deltaTimeSeconds)
 {
+
 	// check if the game stops after 1 minute
-	if (glfwGetTime() - startTime >= 60) {
+	if (glfwGetTime() - startTime >= 60 && !gameOver) {
+		cout << "GAME OVER" << endl;
+		cout << "SCORE: " << score << endl;
 		gameOver = true;
 	}
 
+	if (prevTime && abs(60 - glfwGetTime() + startTime - int(60 - glfwGetTime() + startTime)) <= 0.1f) {
+		if (prevTime != int(60 - glfwGetTime() + startTime)) {
+			prevTime = int(60 - glfwGetTime() + startTime);
+			cout << "TIME LEFT: " << prevTime << endl;
+		}
+	}
+
+	// enemy tanks shooting if my_tank is in the range of their front (2.0f default because that is the projectile max distance)
+	if (!gameOver)
+		for (int i = 0; i < enemy_tanks.size(); i++) {
+			if (glfwGetTime() - enemy_tanks[i]->last_projectile_time >= PROJECTILE_SHOOTING_TIME) {
+
+				glm::vec3 my_tank_position = my_tank->bottom_position;
+				glm::vec3 enemy_tank_position = enemy_tanks[i]->bottom_position;
+
+				float distance = sqrt((my_tank_position[0] - enemy_tank_position[0]) * (my_tank_position[0] - enemy_tank_position[0]) +
+								(my_tank_position[2] - enemy_tank_position[2]) * (my_tank_position[2] - enemy_tank_position[2]));
+				if (distance <= 2.0f) {
+
+					float radius = 0.0125f;
+					TankComponent* cannon = enemy_tanks[i]->cannon;
+					Projectile* projectile = new Projectile(1, enemy_tanks[i]->bottom_position, 1);
+					projectile->position[0] = enemy_tanks[i]->bottom_position[0];
+					projectile->position[1] = enemy_tanks[i]->cannon->bottom_position[1];
+					projectile->position[2] = enemy_tanks[i]->bottom_position[2];
+
+					projectile->angle = RADIANS(enemy_tanks[i]->cannon->rotation_angle + enemy_tanks[i]->rotation_angle);
+					projectile->radius = radius;
+					projectile->appear_time = glfwGetTime();
+					enemy_tanks[i]->last_projectile_time = projectile->appear_time;
+				
+					projectiles_vector.push_back(projectile);
+				}
+			}
+		}
+
+	// Movement of the enemy tanks (default distance on front and on back)
+	if (!gameOver)
+		for (int i = 0; i < enemy_tanks.size(); i++) {
+
+			enemy_tanks[i]->steps += deltaTimeSeconds / 2;
+
+			if (enemy_tanks[i]->steps >= ENEMY_TANK_MOVEMENT) {
+				enemy_tanks[i]->steps = 0;
+				enemy_tanks[i]->goesPositive *= -1;
+			}
+		
+			enemy_tanks[i]->bottom_position[0] -= sin(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
+			enemy_tanks[i]->bottom_position[2] -= cos(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
+		}
+
+	// my_tank <-> enemy tank collision
+
+	if (!gameOver)
+	for (int i = 0; i < enemy_tanks.size(); i++) {
+			float sum_radiuses = my_tank->radius + enemy_tanks[i]->radius;
+			float distance = sqrt((my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) * (my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) +
+				(my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]) * (my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]));
+
+			float P = abs(sum_radiuses + TANK_COLLISION_ERROR - distance);
+
+			//cout << sum_radiuses << " " << distance << " " << P << endl;
+
+			if (distance <= sum_radiuses + TANK_COLLISION_ERROR) {
+				cout << "Hitting" << endl;
+				my_tank->bottom_position[0] += P * (my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) / distance;
+				my_tank->bottom_position[2] += P * (my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]) / distance;
+
+				enemy_tanks[i]->bottom_position[0] += P * (enemy_tanks[i]->bottom_position[0] - my_tank->bottom_position[0]) / distance;
+				enemy_tanks[i]->bottom_position[2] += P * (enemy_tanks[i]->bottom_position[2] - my_tank->bottom_position[2]) / distance;
+			}
+		}
+
 	{
 		// render the power ups
-		for (int i = 0; i < POWER_UPS_NUMBER; i++) {
+		for (int i = 0; i < powerUps_vector.size(); i++) {
 			glm::mat4 modelMatrix = glm::mat4(1);
 			modelMatrix = glm::translate(modelMatrix, powerUps_vector[i]->bottom_position);
-			modelMatrix = glm::scale(modelMatrix, glm::vec3(powerUps_vector[i]->radius * 5));
 
 			string name = "";
 
@@ -196,33 +296,61 @@ void Lab7::Update(float deltaTimeSeconds)
 		}
 	}
 
+	// check for collisions first
+
+	// collision with buildings
+	for (int j = 0; j < BUILDINGS_NUMBER; j++) {
+		// sum of the radiuses < distance between the centers
+		float sum_radiuses = my_tank->radius + buildings[j]->radius;
+		float distance = sqrt((my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) * (my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) +
+			(my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]));
+
+		/*	Daca Distanta_Intre_Tancuri < Raza_Tanc_1 + Raza_Tanc_2, atunci acestea s - au ciocnit.
+
+			Si se suprapun cu o distanta egala cu | P | = (Raza_Tanc_1 + Raza_Tanc_2 - Distanta_Intre_Tancuri)
+
+			pentru a evita suprapunerea lor, trebuie sa mutam tancurile în direcții opuse astfel încât distanța dintre acestea sa creasca cu | P | .*/
+
+		float P = abs(sum_radiuses + BUILDINGS_COLLISION_ERROR - distance);
+
+		if (distance <= sum_radiuses + BUILDINGS_COLLISION_ERROR) {
+			cout << "Hitting" << endl;
+			my_tank->bottom_position[0] += P * (my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) / distance;
+			my_tank->bottom_position[2] += P * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) / distance;
+		}
+	}
+
+	// collision with power_ups
+
+	for (int j = 0; j < powerUps_vector.size(); j++) {
+		// sum of the radiuses < distance between the centers
+		float sum_radiuses = my_tank->radius + powerUps_vector[j]->radius;
+		float distance = sqrt((my_tank->bottom_position[0] - powerUps_vector[j]->bottom_position[0]) * (my_tank->bottom_position[0] - powerUps_vector[j]->bottom_position[0]) +
+			(my_tank->bottom_position[2] - powerUps_vector[j]->bottom_position[2]) * (my_tank->bottom_position[2] - powerUps_vector[j]->bottom_position[2]));
+
+		// if collision, remove the power up
+		if (distance <= sum_radiuses + PUPS_COLLISION_ERROR) {
+
+			switch (powerUps_vector[j]->type) {
+			case 0:
+				my_tank->lives++;
+				break;
+			case 1:
+				// add 10 seconds to the game
+				startTime += 10;
+				break;
+			case 2:
+				// make the tank invincible for 5 seconds
+				my_tank->isInvincible = true;
+				break;
+			}
+
+			powerUps_vector.erase(powerUps_vector.begin() + j);
+		}
+	}
+
 	// render each tank components
 	for (int i = 0; i < 4; i++) {
-
-		// check for collisions first
-
-		// collision with buildings
-
-		for (int j = 0; j < BUILDINGS_NUMBER; j++) {
-			// sum of the radiuses < distance between the centers
-			float sum_radiuses = my_tank->radius + buildings[j]->radius;
-			float distance = sqrt((my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) * (my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) +
-				(my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]));
-
-			/*	Daca Distanta_Intre_Tancuri < Raza_Tanc_1 + Raza_Tanc_2, atunci acestea s - au ciocnit.
-
-				Si se suprapun cu o distanta egala cu | P | = (Raza_Tanc_1 + Raza_Tanc_2 - Distanta_Intre_Tancuri)
-
-				pentru a evita suprapunerea lor, trebuie sa mutam tancurile în direcții opuse astfel încât distanța dintre acestea sa creasca cu | P | .*/
-
-			float P = abs(sum_radiuses + COLLISION_ERROR - distance);
-
-			if (distance <= sum_radiuses + COLLISION_ERROR) {
-				cout << "Hitting" << endl;
-				my_tank->bottom_position[0] += P * (my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) / distance;
-				my_tank->bottom_position[2] += P * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) / distance;
-			}
-		}
 
 		glm::mat4 modelMatrix = glm::mat4(1);
 
@@ -241,14 +369,105 @@ void Lab7::Update(float deltaTimeSeconds)
 	}
 
 	for (int i = 0; i < projectiles_vector.size(); i++) {
+
+		if (glfwGetTime() - projectiles_vector[i]->appear_time >= PROJECTILE_MAX_TIME) {
+			projectiles_vector.erase(projectiles_vector.begin() + i);
+			continue;
+		}
+
 		glm::mat4 modelMatrix = glm::mat4(1);
 		modelMatrix = glm::translate(modelMatrix, projectiles_vector[i]->position);
 		modelMatrix = glm::scale(modelMatrix, glm::vec3(projectiles_vector[i]->radius * 2));
+
+		// check if the projectile hit an enemy tank
+		bool hit = false;
+		for (int j = 0; j < enemy_tanks.size(); j++) {
+			float sum_radiuses = projectiles_vector[i]->radius + enemy_tanks[j]->radius;
+			float distance = sqrt((projectiles_vector[i]->position[0] - enemy_tanks[j]->bottom_position[0]) * (projectiles_vector[i]->position[0] - enemy_tanks[j]->bottom_position[0]) +
+				(projectiles_vector[i]->position[2] - enemy_tanks[j]->bottom_position[2]) * (projectiles_vector[i]->position[2] - enemy_tanks[j]->bottom_position[2]));
+
+
+			if (!gameOver && distance <= sum_radiuses && !projectiles_vector[i]->isEnemy) {
+				
+				hit = true;
+				enemy_tanks[j]->lives--;
+				projectiles_vector.erase(projectiles_vector.begin() + i);
+				score += 10;
+
+				if (enemy_tanks[j]->lives == 0) {
+					enemy_tanks.erase(enemy_tanks.begin() + j);
+				}
+				break;
+			}
+		}
+
+		if (hit)
+			continue;
+
+		// check if the projectile my tank
+		float sum_radiuses = projectiles_vector[i]->radius + my_tank->radius;
+		float distance = sqrt((projectiles_vector[i]->position[0] - my_tank->bottom_position[0]) * (projectiles_vector[i]->position[0] - my_tank->bottom_position[0]) +
+					(projectiles_vector[i]->position[2] - my_tank->bottom_position[2]) * (projectiles_vector[i]->position[2] - my_tank->bottom_position[2]));
+
+		if (!gameOver && distance <= sum_radiuses && projectiles_vector[i]->isEnemy) {
+			my_tank->lives--;
+			projectiles_vector.erase(projectiles_vector.begin() + i);
+			hit = true;
+			score -= 5;
+			if (my_tank->lives == 0) {
+				cout << "GAME OVER" << endl;
+				cout << "YOU LOST"<< endl;
+				gameOver = true;
+			}
+		}
+
+		if (hit)
+			continue;
+
+		// check if the projectile hit a building
+		for (int j = 0; j < BUILDINGS_NUMBER; j++) {
+			float sum_radiuses = projectiles_vector[i]->radius + buildings[j]->radius;
+			float distance = sqrt((projectiles_vector[i]->position[0] - buildings[j]->bottom_position[0]) * (projectiles_vector[i]->position[0] - buildings[j]->bottom_position[0]) +
+							(projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]) * (projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]));
+
+			if (distance <= sum_radiuses) {
+				hit = true;
+				projectiles_vector.erase(projectiles_vector.begin() + i);
+				break;
+			}
+		}
+
+		if (hit)
+			continue;
+
 		RenderMesh(meshes["sphere"], shaders["LabShader"], modelMatrix, glm::vec3(0.5, 0.5, 0.5));
 
+		int speed = projectiles_vector[i]->isEnemy ? 1 : 2;
 		// adding movement to the projectile
-		projectiles_vector[i]->position[0] -= sin(projectiles_vector[i]->angle) * deltaTimeSeconds;
-		projectiles_vector[i]->position[2] -= cos(projectiles_vector[i]->angle) * deltaTimeSeconds;
+		projectiles_vector[i]->position[0] -= sin(projectiles_vector[i]->angle) * deltaTimeSeconds * speed;
+		projectiles_vector[i]->position[2] -= cos(projectiles_vector[i]->angle) * deltaTimeSeconds * speed;
+
+	}
+
+	// render the enemies tanks
+	for (int i = 0; i < enemy_tanks.size(); i++) {
+		for (int j = 0; j < 4; j++) {
+
+			glm::mat4 modelMatrix = glm::mat4(1);
+
+			modelMatrix = glm::translate(modelMatrix, glm::vec3(enemy_tanks[i]->bottom_position));
+
+			// to make it point front
+			modelMatrix = glm::rotate(modelMatrix, RADIANS(90.0f), glm::vec3(0, 1, 0));
+			modelMatrix = glm::translate(modelMatrix, enemy_tanks[i]->components[j]->bottom_position);
+			modelMatrix = glm::rotate(modelMatrix, RADIANS(enemy_tanks[i]->components[j]->default_rotation_angle), glm::vec3(1, 0, 0));
+			modelMatrix = glm::scale(modelMatrix, glm::vec3(enemy_tanks[i]->components[j]->default_scale_factor));
+
+			// movement
+			modelMatrix = glm::rotate(modelMatrix, RADIANS(enemy_tanks[i]->rotation_angle + enemy_tanks[i]->components[j]->rotation_angle), glm::vec3(enemy_tanks[i]->components[j]->rotationX_Y, enemy_tanks[i]->components[j]->rotationY_Y, enemy_tanks[i]->components[j]->rotationZ_Y));
+
+			RenderMesh(meshes[enemy_tanks[i]->components[j]->name], shaders["LabShader"], modelMatrix, enemy_tanks[i]->components[j]->color);
+		}
 	}
 
 	{
@@ -338,7 +557,7 @@ void Lab7::OnInputUpdate(float deltaTime, int mods)
 
 	// only if right click is not pressed
 
-	if (!window->MouseHold(GLFW_MOUSE_BUTTON_RIGHT)) {
+	if (!gameOver && !window->MouseHold(GLFW_MOUSE_BUTTON_RIGHT)) {
 
 		glm::vec3 forward = glm::normalize(glm::vec3(sin(RADIANS(my_tank->rotation_angle)), 0, cos(RADIANS(my_tank->rotation_angle))));
 
@@ -360,18 +579,18 @@ void Lab7::OnInputUpdate(float deltaTime, int mods)
 		}
 
 		if (window->MouseHold(GLFW_MOUSE_BUTTON_LEFT)) {
-			if (glfwGetTime() - my_tank->last_projectile_time >= 1.0) {
+			if (glfwGetTime() - my_tank->last_projectile_time >= PROJECTILE_SHOOTING_TIME) {
 
 				float radius = 0.0125f;
-				float angle = RADIANS(my_tank->cannon->rotation_angle);
 				TankComponent* cannon = my_tank->cannon;
-				Projectile* projectile = new Projectile(1, my_tank->bottom_position);
+				Projectile* projectile = new Projectile(1, my_tank->bottom_position, 0);
 				// glm::vec3(-0.05f, .14f, 0) -> cannon
 				projectile->position[0] = my_tank->bottom_position[0];
 				projectile->position[1] = my_tank->cannon->bottom_position[1];
 				projectile->position[2] = my_tank->bottom_position[2];
 
-				projectile->angle = angle + my_tank->rotation_angle;
+				projectile->angle = RADIANS(my_tank->cannon->rotation_angle + my_tank->rotation_angle);
+				cout << "angle: " << projectile->angle << endl;
 				projectile->radius = radius;
 				projectiles_vector.push_back(projectile);
 
@@ -396,19 +615,19 @@ void Lab7::OnKeyRelease(int key, int mods)
 
 void Lab7::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
 {
-	// if mouse points to the left, rotate the tank head to the left
-	if (deltaX < 0) {
-		TankComponent* head = my_tank->head;
-		TankComponent* cannon = my_tank->cannon;
-		head->rotation_angle += 1;
-		cannon->rotation_angle += 1;
-	}
-	else if (deltaX > 0) {
-		TankComponent* head = my_tank->head;
-		TankComponent* cannon = my_tank->cannon;
-		head->rotation_angle -= 1;
-		cannon->rotation_angle -= 1;
-	}
+	// the tank head and cannon rotate to the position of the mouse
+
+	TankComponent* head = my_tank->head;
+	TankComponent* cannon = my_tank->cannon;
+
+	float x = 1.0f * mouseX - window->props.resolution.x / 2;
+	float y = 1.0f * mouseY - window->props.resolution.y / 2;
+
+	float angle = atan2(y, x);
+
+	head->rotation_angle = -glm::degrees(angle);
+	cannon->rotation_angle = -glm::degrees(angle);
+
 }
 
 

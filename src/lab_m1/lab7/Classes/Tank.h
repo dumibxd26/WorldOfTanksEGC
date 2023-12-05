@@ -16,8 +16,13 @@ public:
 	int goesPositive; // 1 if positive, -1 if negative, depeonds on rotation angle
 	int lives;
 	int translation_speed = 1;
-	int rotation_speed = 50;
+	int rotation_speed = 100;
 	float radius;
+	bool isInvincible = false;
+	float invincibleTime = 5;
+	bool isEnemy;
+
+	float steps = 0;
 
 	TankComponent* head;
 	TankComponent* cannon;
@@ -28,6 +33,6 @@ public:
 	float last_projectile_time = 0;
 	std::vector<Projectile *> projectiles;
 
-	Tank(glm::vec3 bottom_position, float color_intensity, float rotation_angle, TankComponent* head, TankComponent* cannon, TankComponent* tracks, TankComponent* base);
+	Tank(glm::vec3 bottom_position, float color_intensity, float rotation_angle, TankComponent* head, TankComponent* cannon, TankComponent* tracks, TankComponent* base, bool isEnemy);
 };
 

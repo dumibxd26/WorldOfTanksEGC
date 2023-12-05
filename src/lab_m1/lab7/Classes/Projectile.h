@@ -9,7 +9,8 @@ public:
 	glm::vec3 position;
 	float appear_time;
 	float angle = 0;
+	bool isEnemy;
 
-	Projectile(float radius, glm::vec3 position);
+	Projectile(float radius, glm::vec3 position, bool isEnemy);
 };
 
