@@ -33,6 +33,17 @@ Lab7::~Lab7()
 
 void Lab7::Init()
 {
+
+	// set the camera
+	renderCameraTarget = false;
+
+	camera = new implemented::Camera();
+	camera->Set(glm::vec3(0, 0.2f, 1), glm::vec3(0, 1, 0), glm::vec3(0, 1, 0));
+	// set the camera forward as the direction of the tank
+	camera->forward = glm::vec3(0, 0, -1);
+
+	projectionMatrix = glm::perspective(RADIANS(30), window->props.aspectRatio, 0.01f, 200.0f);
+
 	// time when the game starts
 	startTime = glfwGetTime();
 	gameOver = false;
@@ -158,10 +169,10 @@ void Lab7::Init()
 
 	// Light & material properties
 	{
-		lightPosition = glm::vec3(0, 1, 1);
-		materialShininess = 30;
-		materialKd = 0.5;
-		materialKs = 0.5;
+		lightPosition = glm::vec3(0.5f, 3, 0.5f);
+		materialShininess = 20;
+		materialKd = 1;
+		materialKs = 1;
 	}
 }
 
@@ -181,16 +192,24 @@ void Lab7::FrameStart()
 void Lab7::Update(float deltaTimeSeconds)
 {
 
+	if (my_tank->isInvincible) {
+
+		cout << "You are invincible for: " << 10 - (glfwGetTime() - my_tank->invincibleTime) << " seconds" << endl;
+
+		if (glfwGetTime() - my_tank->invincibleTime >= 10)
+			my_tank->isInvincible = false;
+	}
+
 	// check if the game stops after 1 minute
-	if (glfwGetTime() - startTime >= 60 && !gameOver) {
+	if (glfwGetTime() - startTime >= 120 && !gameOver) {
 		cout << "GAME OVER" << endl;
 		cout << "SCORE: " << score << endl;
 		gameOver = true;
 	}
 
-	if (prevTime && abs(60 - glfwGetTime() + startTime - int(60 - glfwGetTime() + startTime)) <= 0.1f) {
-		if (prevTime != int(60 - glfwGetTime() + startTime)) {
-			prevTime = int(60 - glfwGetTime() + startTime);
+	if (prevTime && abs(120 - glfwGetTime() + startTime - int(120 - glfwGetTime() + startTime)) <= 0.1f) {
+		if (prevTime != int(120 - glfwGetTime() + startTime)) {
+			prevTime = int(120 - glfwGetTime() + startTime);
 			cout << "TIME LEFT: " << prevTime << endl;
 		}
 	}
@@ -198,13 +217,13 @@ void Lab7::Update(float deltaTimeSeconds)
 	// enemy tanks shooting if my_tank is in the range of their front (2.0f default because that is the projectile max distance)
 	if (!gameOver)
 		for (int i = 0; i < enemy_tanks.size(); i++) {
-			if (glfwGetTime() - enemy_tanks[i]->last_projectile_time >= PROJECTILE_SHOOTING_TIME) {
+			if (enemy_tanks[i]->lives && glfwGetTime() - enemy_tanks[i]->last_projectile_time >= PROJECTILE_SHOOTING_TIME) {
 
 				glm::vec3 my_tank_position = my_tank->bottom_position;
 				glm::vec3 enemy_tank_position = enemy_tanks[i]->bottom_position;
 
 				float distance = sqrt((my_tank_position[0] - enemy_tank_position[0]) * (my_tank_position[0] - enemy_tank_position[0]) +
-								(my_tank_position[2] - enemy_tank_position[2]) * (my_tank_position[2] - enemy_tank_position[2]));
+					(my_tank_position[2] - enemy_tank_position[2]) * (my_tank_position[2] - enemy_tank_position[2]));
 				if (distance <= 2.0f) {
 
 					float radius = 0.0125f;
@@ -218,7 +237,7 @@ void Lab7::Update(float deltaTimeSeconds)
 					projectile->radius = radius;
 					projectile->appear_time = glfwGetTime();
 					enemy_tanks[i]->last_projectile_time = projectile->appear_time;
-				
+
 					projectiles_vector.push_back(projectile);
 				}
 			}
@@ -234,15 +253,17 @@ void Lab7::Update(float deltaTimeSeconds)
 				enemy_tanks[i]->steps = 0;
 				enemy_tanks[i]->goesPositive *= -1;
 			}
-		
-			enemy_tanks[i]->bottom_position[0] -= sin(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
-			enemy_tanks[i]->bottom_position[2] -= cos(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
+
+			if (enemy_tanks[i]->lives) {
+				enemy_tanks[i]->bottom_position[0] -= sin(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
+				enemy_tanks[i]->bottom_position[2] -= cos(RADIANS(enemy_tanks[i]->rotation_angle)) * deltaTimeSeconds / 2 * enemy_tanks[i]->goesPositive;
+			}
 		}
 
 	// my_tank <-> enemy tank collision
 
 	if (!gameOver)
-	for (int i = 0; i < enemy_tanks.size(); i++) {
+		for (int i = 0; i < enemy_tanks.size(); i++) {
 			float sum_radiuses = my_tank->radius + enemy_tanks[i]->radius;
 			float distance = sqrt((my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) * (my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) +
 				(my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]) * (my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]));
@@ -252,12 +273,13 @@ void Lab7::Update(float deltaTimeSeconds)
 			//cout << sum_radiuses << " " << distance << " " << P << endl;
 
 			if (distance <= sum_radiuses + TANK_COLLISION_ERROR) {
-				cout << "Hitting" << endl;
 				my_tank->bottom_position[0] += P * (my_tank->bottom_position[0] - enemy_tanks[i]->bottom_position[0]) / distance;
 				my_tank->bottom_position[2] += P * (my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]) / distance;
 
 				enemy_tanks[i]->bottom_position[0] += P * (enemy_tanks[i]->bottom_position[0] - my_tank->bottom_position[0]) / distance;
 				enemy_tanks[i]->bottom_position[2] += P * (enemy_tanks[i]->bottom_position[2] - my_tank->bottom_position[2]) / distance;
+
+				camera->TranslateForward(-2 * P * (my_tank->bottom_position[2] - enemy_tanks[i]->bottom_position[2]) / distance);
 			}
 		}
 
@@ -281,7 +303,7 @@ void Lab7::Update(float deltaTimeSeconds)
 				break;
 			}
 
-			RenderMesh(meshes[name], shaders["LabShader"], modelMatrix, powerUps_vector[i]->color);
+			RenderMesh(meshes[name], shaders["LabShader"], modelMatrix, powerUps_vector[i]->color, MAX_LIVES);
 		}
 	}
 
@@ -292,7 +314,7 @@ void Lab7::Update(float deltaTimeSeconds)
 			glm::mat4 modelMatrix = glm::mat4(1);
 			modelMatrix = glm::translate(modelMatrix, buildings[i]->bottom_position);
 			modelMatrix = glm::scale(modelMatrix, buildings[i]->size);
-			RenderMesh(building, shaders["LabShader"], modelMatrix, buildings[i]->color);
+			RenderMesh(building, shaders["LabShader"], modelMatrix, buildings[i]->color, MAX_LIVES);
 		}
 	}
 
@@ -314,9 +336,10 @@ void Lab7::Update(float deltaTimeSeconds)
 		float P = abs(sum_radiuses + BUILDINGS_COLLISION_ERROR - distance);
 
 		if (distance <= sum_radiuses + BUILDINGS_COLLISION_ERROR) {
-			cout << "Hitting" << endl;
 			my_tank->bottom_position[0] += P * (my_tank->bottom_position[0] - buildings[j]->bottom_position[0]) / distance;
 			my_tank->bottom_position[2] += P * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) / distance;
+
+			camera->TranslateForward(-P * (my_tank->bottom_position[2] - buildings[j]->bottom_position[2]) / distance);
 		}
 	}
 
@@ -336,12 +359,13 @@ void Lab7::Update(float deltaTimeSeconds)
 				my_tank->lives++;
 				break;
 			case 1:
-				// add 10 seconds to the game
-				startTime += 10;
+				// add 20 seconds to the game
+				startTime += 20;
 				break;
 			case 2:
-				// make the tank invincible for 5 seconds
+				// make the tank invincible for 10 seconds
 				my_tank->isInvincible = true;
+				my_tank->invincibleTime = glfwGetTime();
 				break;
 			}
 
@@ -365,7 +389,7 @@ void Lab7::Update(float deltaTimeSeconds)
 		// movement
 		modelMatrix = glm::rotate(modelMatrix, RADIANS(my_tank->rotation_angle + my_tank->components[i]->rotation_angle), glm::vec3(my_tank->components[i]->rotationX_Y, my_tank->components[i]->rotationY_Y, my_tank->components[i]->rotationZ_Y));
 
-		RenderMesh(meshes[my_tank->components[i]->name], shaders["LabShader"], modelMatrix, my_tank->components[i]->color);
+		RenderMesh(meshes[my_tank->components[i]->name], shaders["LabShader"], modelMatrix, my_tank->components[i]->color, my_tank->lives);
 	}
 
 	for (int i = 0; i < projectiles_vector.size(); i++) {
@@ -387,16 +411,13 @@ void Lab7::Update(float deltaTimeSeconds)
 				(projectiles_vector[i]->position[2] - enemy_tanks[j]->bottom_position[2]) * (projectiles_vector[i]->position[2] - enemy_tanks[j]->bottom_position[2]));
 
 
-			if (!gameOver && distance <= sum_radiuses && !projectiles_vector[i]->isEnemy) {
-				
+			if (!gameOver && distance <= sum_radiuses && !projectiles_vector[i]->isEnemy && enemy_tanks[j]->lives) {
+
 				hit = true;
 				enemy_tanks[j]->lives--;
 				projectiles_vector.erase(projectiles_vector.begin() + i);
 				score += 10;
 
-				if (enemy_tanks[j]->lives == 0) {
-					enemy_tanks.erase(enemy_tanks.begin() + j);
-				}
 				break;
 			}
 		}
@@ -407,16 +428,16 @@ void Lab7::Update(float deltaTimeSeconds)
 		// check if the projectile my tank
 		float sum_radiuses = projectiles_vector[i]->radius + my_tank->radius;
 		float distance = sqrt((projectiles_vector[i]->position[0] - my_tank->bottom_position[0]) * (projectiles_vector[i]->position[0] - my_tank->bottom_position[0]) +
-					(projectiles_vector[i]->position[2] - my_tank->bottom_position[2]) * (projectiles_vector[i]->position[2] - my_tank->bottom_position[2]));
+			(projectiles_vector[i]->position[2] - my_tank->bottom_position[2]) * (projectiles_vector[i]->position[2] - my_tank->bottom_position[2]));
 
-		if (!gameOver && distance <= sum_radiuses && projectiles_vector[i]->isEnemy) {
+		if (!my_tank->isInvincible && !gameOver && distance <= sum_radiuses && projectiles_vector[i]->isEnemy) {
 			my_tank->lives--;
 			projectiles_vector.erase(projectiles_vector.begin() + i);
 			hit = true;
 			score -= 5;
 			if (my_tank->lives == 0) {
 				cout << "GAME OVER" << endl;
-				cout << "YOU LOST"<< endl;
+				cout << "YOU LOST" << endl;
 				gameOver = true;
 			}
 		}
@@ -428,7 +449,7 @@ void Lab7::Update(float deltaTimeSeconds)
 		for (int j = 0; j < BUILDINGS_NUMBER; j++) {
 			float sum_radiuses = projectiles_vector[i]->radius + buildings[j]->radius;
 			float distance = sqrt((projectiles_vector[i]->position[0] - buildings[j]->bottom_position[0]) * (projectiles_vector[i]->position[0] - buildings[j]->bottom_position[0]) +
-							(projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]) * (projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]));
+				(projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]) * (projectiles_vector[i]->position[2] - buildings[j]->bottom_position[2]));
 
 			if (distance <= sum_radiuses) {
 				hit = true;
@@ -440,9 +461,9 @@ void Lab7::Update(float deltaTimeSeconds)
 		if (hit)
 			continue;
 
-		RenderMesh(meshes["sphere"], shaders["LabShader"], modelMatrix, glm::vec3(0.5, 0.5, 0.5));
+		RenderMesh(meshes["sphere"], shaders["LabShader"], modelMatrix, glm::vec3(0.5, 0.5, 0.5), MAX_LIVES);
 
-		int speed = projectiles_vector[i]->isEnemy ? 1 : 2;
+		int speed = projectiles_vector[i]->isEnemy ? 1 : 3;
 		// adding movement to the projectile
 		projectiles_vector[i]->position[0] -= sin(projectiles_vector[i]->angle) * deltaTimeSeconds * speed;
 		projectiles_vector[i]->position[2] -= cos(projectiles_vector[i]->angle) * deltaTimeSeconds * speed;
@@ -466,7 +487,7 @@ void Lab7::Update(float deltaTimeSeconds)
 			// movement
 			modelMatrix = glm::rotate(modelMatrix, RADIANS(enemy_tanks[i]->rotation_angle + enemy_tanks[i]->components[j]->rotation_angle), glm::vec3(enemy_tanks[i]->components[j]->rotationX_Y, enemy_tanks[i]->components[j]->rotationY_Y, enemy_tanks[i]->components[j]->rotationZ_Y));
 
-			RenderMesh(meshes[enemy_tanks[i]->components[j]->name], shaders["LabShader"], modelMatrix, enemy_tanks[i]->components[j]->color);
+			RenderMesh(meshes[enemy_tanks[i]->components[j]->name], shaders["LabShader"], modelMatrix, enemy_tanks[i]->components[j]->color, enemy_tanks[i]->lives);
 		}
 	}
 
@@ -474,7 +495,7 @@ void Lab7::Update(float deltaTimeSeconds)
 		glm::mat4 modelMatrix = glm::mat4(1);
 		modelMatrix = glm::translate(modelMatrix, glm::vec3(0.5f, 0.01f, 0.5f));
 		modelMatrix = glm::rotate(modelMatrix, RADIANS(-90.0f), glm::vec3(1, 0, 0));
-		RenderMesh(meshes["AGORA"], shaders["Simple"], modelMatrix);
+		RenderMesh(meshes["AGORA"], shaders["Simple"], modelMatrix, glm::vec3(0), MAX_LIVES);
 	}
 
 	// Render ground
@@ -483,7 +504,15 @@ void Lab7::Update(float deltaTimeSeconds)
 		modelMatrix = glm::translate(modelMatrix, glm::vec3(0, 0.01f, 0));
 		modelMatrix = glm::scale(modelMatrix, glm::vec3(0.5f));
 
-		RenderMesh(meshes["plane"], shaders["LabShader"], modelMatrix, glm::vec3(0, 0, 1));
+		RenderMesh(meshes["plane"], shaders["LabShader"], modelMatrix, glm::vec3(0, 0, 1), MAX_LIVES);
+	}
+
+	if (renderCameraTarget)
+	{
+		glm::mat4 modelMatrix = glm::mat4(1);
+		modelMatrix = glm::translate(modelMatrix, camera->GetTargetPosition());
+		modelMatrix = glm::scale(modelMatrix, glm::vec3(0.1f));
+		RenderMesh(meshes["sphere"], shaders["VertexNormal"], modelMatrix, glm::vec3(0), MAX_LIVES);
 	}
 
 }
@@ -491,7 +520,7 @@ void Lab7::Update(float deltaTimeSeconds)
 
 void Lab7::FrameEnd()
 {
-	DrawCoordinateSystem();
+	DrawCoordinateSystem(camera->GetViewMatrix(), projectionMatrix);
 }
 
 
@@ -590,12 +619,53 @@ void Lab7::OnInputUpdate(float deltaTime, int mods)
 				projectile->position[2] = my_tank->bottom_position[2];
 
 				projectile->angle = RADIANS(my_tank->cannon->rotation_angle + my_tank->rotation_angle);
-				cout << "angle: " << projectile->angle << endl;
 				projectile->radius = radius;
 				projectiles_vector.push_back(projectile);
 
 				my_tank->last_projectile_time = projectile->appear_time = glfwGetTime();
 			}
+		}
+	}
+
+	if (!gameOver) {
+
+		float cameraSpeedROTATE = 1.75f;
+		float cameraSpeed = 1.0f;
+
+		if (window->KeyHold(GLFW_KEY_W)) {
+			// TODO(student): Translate the camera forward
+			camera->TranslateForward(deltaTime * cameraSpeed);
+
+		}
+
+		if (window->KeyHold(GLFW_KEY_A)) {
+			// TODO(student): Translate the camera to the left
+			// camera rotation as in the tank movement
+			camera->TranslateForward(1);
+			camera->RotateFirstPerson_OY(deltaTime * cameraSpeedROTATE);
+			camera->TranslateForward(-1);
+		}
+
+		if (window->KeyHold(GLFW_KEY_S)) {
+			// TODO(student): Translate the camera backward
+			camera->TranslateForward(-deltaTime * cameraSpeed);
+		}
+
+		if (window->KeyHold(GLFW_KEY_D)) {
+			// TODO(student): Translate the camera to the right
+			camera->TranslateForward(1);
+			camera->RotateFirstPerson_OY(-deltaTime * cameraSpeedROTATE);
+			camera->TranslateForward(-1);
+		}
+
+		if (window->KeyHold(GLFW_KEY_Q)) {
+			// TODO(student): Translate the camera downward
+			camera->TranslateUpward(-deltaTime * cameraSpeed);
+		}
+
+		if (window->KeyHold(GLFW_KEY_E)) {
+			// TODO(student): Translate the camera upward
+			camera->TranslateUpward(deltaTime * cameraSpeed);
 		}
 	}
 }
@@ -628,6 +698,18 @@ void Lab7::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
 	head->rotation_angle = -glm::degrees(angle);
 	cannon->rotation_angle = -glm::degrees(angle);
 
+
+	// rotate the camera around the tank on OY
+
+	if (window->MouseHold(GLFW_MOUSE_BUTTON_RIGHT)) {
+
+		int cursor_pos = angle > 0 ? 1 : -1;
+
+		camera->TranslateForward(1);
+		camera->RotateFirstPerson_OY(cursor_pos * 0.01f);
+		camera->TranslateForward(-1);
+	}
+
 }
 
 
@@ -650,4 +732,37 @@ void Lab7::OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY)
 
 void Lab7::OnWindowResize(int width, int height)
 {
+}
+
+void Lab7::RenderMesh(Mesh* mesh, Shader* shader, const glm::mat4& modelMatrix, const glm::vec3& color, float& HP)
+{
+	if (!mesh || !shader || !shader->program)
+		return;
+
+	// Render an object using the specified shader and the specified position
+	shader->Use();
+	glUniformMatrix4fv(shader->loc_view_matrix, 1, GL_FALSE, glm::value_ptr(camera->GetViewMatrix()));
+	glUniformMatrix4fv(shader->loc_projection_matrix, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+	glUniformMatrix4fv(shader->loc_model_matrix, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+	GLint location_light_pos = glGetUniformLocation(shader->program, "light_position");
+	glUniform3fv(location_light_pos, 1, glm::value_ptr(lightPosition));
+
+	GLint location_material = glGetUniformLocation(shader->program, "material_shininess");
+	glUniform1i(location_material, materialShininess);
+
+	GLint send_HP = glGetUniformLocation(shader->program, "HP");
+	glUniform1f(send_HP, HP);
+
+	location_material = glGetUniformLocation(shader->program, "material_kd");
+	glUniform1f(location_material, materialKd);
+
+	location_material = glGetUniformLocation(shader->program, "material_ks");
+	glUniform1f(location_material, materialKs);
+
+
+	location_material = glGetUniformLocation(shader->program, "object_color");
+	glUniform3fv(location_material, 1, glm::value_ptr(color));
+
+	mesh->Render();
 }

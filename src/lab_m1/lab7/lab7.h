@@ -8,6 +8,7 @@
 #include "./Classes/Tank.h"
 #include "./Classes/Projectile.h"
 #include "./Classes/PowerUp.h"
+#include "lab_camera.h"
 
 #define BUILDINGS_NUMBER 10
 #define POWER_UPS_NUMBER 9
@@ -30,6 +31,8 @@ namespace m1
 
         void RenderSimpleMesh(Mesh *mesh, Shader *shader, const glm::mat4 &modelMatrix, const glm::vec3 &color = glm::vec3(1));
 
+        void Lab7::RenderMesh(Mesh* mesh, Shader* shader, const glm::mat4& modelMatrix, const glm::vec3& color, float& HP);
+
         void OnInputUpdate(float deltaTime, int mods) override;
         void OnKeyPress(int key, int mods) override;
         void OnKeyRelease(int key, int mods) override;
@@ -43,11 +46,18 @@ namespace m1
         int prevTime = 60;
         bool gameOver;
         int score;
+        float MAX_LIVES = 3;
+
+        implemented::Camera* camera;
+        glm::mat4 projectionMatrix;
+        bool renderCameraTarget;
 
         glm::vec3 lightPosition;
         unsigned int materialShininess;
         float materialKd;
         float materialKs;
+
+        int camera_rotation_direction = 0;
 
         std::vector <Projectile *> projectiles_vector;
 

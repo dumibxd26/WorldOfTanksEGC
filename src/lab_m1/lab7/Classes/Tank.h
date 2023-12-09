@@ -14,7 +14,7 @@ public:
 	float color_intensity;
 	float rotation_angle;
 	int goesPositive; // 1 if positive, -1 if negative, depeonds on rotation angle
-	int lives;
+	float lives;
 	int translation_speed = 1;
 	int rotation_speed = 100;
 	float radius;

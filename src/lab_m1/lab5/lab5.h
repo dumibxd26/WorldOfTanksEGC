@@ -1,7 +1,7 @@
 #pragma once
 
 #include "components/simple_scene.h"
-#include "lab_m1/lab5/lab_camera.h"
+#include "lab_m1/lab7/lab_camera.h"
 
 
 namespace m1
